@@ -1,49 +1,31 @@
 import apache_beam as beam
-from datetime import datetime
-from collections import Counter
 import json
+import emoji
+from apache_beam.options.pipeline_options import PipelineOptions
 
-def parse_tweet(tweet_json):
-    tweet = json.loads(tweet_json)
-    tweet_date = tweet['date'][:10]
-    username = tweet['user']['username']
-    return (tweet_date, username)
+# Función optimizada para extraer solo emojis válidos
+def extract_emojis_from_content(line):
+    def filter_lines_with_emojis(line):
+        return any(char in emoji.EMOJI_DATA for char in line)
+    try:
+        record = json.loads(line)
+        content = filter_lines_with_emojis(record.get('content', ''))
+        return [char for char in content if char in emoji.EMOJI_DATA]  # Filtrar solo emojis reales
 
-def q1_time(input_file):
-    with beam.Pipeline() as pipeline:
-        
-        # Leer y procesar tweets una sola vez
-        parsed_tweets = (
-            pipeline
-            | 'Read input file' >> beam.io.ReadFromText(input_file)
-            | 'Parse tweets' >> beam.Map(parse_tweet)
+    except json.JSONDecodeError:
+        return []  # Ignora líneas mal formateadas
+
+def q2_time_optimized(input_path):
+    with beam.Pipeline(options=PipelineOptions()) as p:
+        (
+            p
+            | 'ReadInputFile' >> beam.io.ReadFromText(input_path)
+            | 'ExtractEmojis' >> beam.FlatMap(extract_emojis_from_content)  # Extrae emojis reales
+            | 'PairWithOne' >> beam.Map(lambda emoji: (emoji, 1))  # Prepara para conteo
+            | 'CountEmojis' >> beam.CombinePerKey(sum)  # Suma ocurrencias
+            | 'Top10Emojis' >> beam.combiners.Top.Of(10, key=lambda x: x[1])  # Mantiene solo el top 10
+            | 'PrintResults' >> beam.FlatMap(print)  # Imprime resultados en tiempo de ejecución
         )
 
-        # Obtener las 10 fechas con más tweets
-        top_dates = (
-            parsed_tweets
-            | 'Count tweets per date' >> beam.combiners.Count.PerKey()
-            | 'Top 10 dates' >> beam.transforms.combiners.Top.Of(10, key=lambda x: x[1])
-            | 'Extract top dates' >> beam.FlatMap(lambda x: x)  # Desempaquetar la lista de Top.Of
-            | 'Create date lookup' >> beam.Map(lambda x: x[0])  # Extraer solo las fechas
-        )
-
-        # Filtrar tweets y encontrar usuario más activo por fecha
-        result = (
-            parsed_tweets
-            | 'Filter top 10 dates' >> beam.Filter(
-                lambda tweet, top_dates_set: tweet[0] in top_dates_set,
-                beam.pvalue.AsList(top_dates)
-            )
-            | 'Group by date and aggregate users' >> beam.GroupByKey()
-            | 'Most active user per date' >> beam.Map(lambda x: (x[0], Counter(x[1]).most_common(1)[0][0]))
-            | 'Format output' >> beam.Map(lambda x: (datetime.strptime(x[0], '%Y-%m-%d').date(), x[1]))
-            | 'Collect results' >> beam.combiners.ToList()
-        )
-
-        # Imprimir resultados
-        result | 'Print results' >> beam.Map(print)
-
-
-
-q1_time("../../data/farmers-protest-tweets-2021-2-4.json")
+input_path = "../../data/farmers-protest-tweets-2021-2-4.json"
+q2_time_optimized(input_path)
