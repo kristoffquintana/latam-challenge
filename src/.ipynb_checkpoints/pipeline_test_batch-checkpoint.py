@@ -1,31 +1,33 @@
 import apache_beam as beam
-import json
-import emoji
 from apache_beam.options.pipeline_options import PipelineOptions
+import json
+import re
 
-# Función optimizada para extraer solo emojis válidos
-def extract_emojis_from_content(line):
-    def filter_lines_with_emojis(line):
-        return any(char in emoji.EMOJI_DATA for char in line)
+# Función para parsear cada línea y devolver un diccionario
+def parse_json_line(line):
     try:
-        record = json.loads(line)
-        content = filter_lines_with_emojis(record.get('content', ''))
-        return [char for char in content if char in emoji.EMOJI_DATA]  # Filtrar solo emojis reales
-
+        return json.loads(line)
     except json.JSONDecodeError:
-        return []  # Ignora líneas mal formateadas
+        return None
 
-def q2_time_optimized(input_path):
-    with beam.Pipeline(options=PipelineOptions()) as p:
+# Función para extraer menciones de usuarios en el campo 'content'
+def extract_mentions(record):
+    if record and 'content' in record:
+        content = record['content']
+        for mention in re.findall(r'@(\w+)', content):  # Busca menciones en formato @usuario
+            yield (mention, 1)
+
+# Pipeline optimizado para tiempo de respuesta
+def run_pipeline(input_path):
+    options = PipelineOptions()
+    with beam.Pipeline(options=options) as p:
         (
             p
-            | 'ReadInputFile' >> beam.io.ReadFromText(input_path)
-            | 'ExtractEmojis' >> beam.FlatMap(extract_emojis_from_content)  # Extrae emojis reales
-            | 'PairWithOne' >> beam.Map(lambda emoji: (emoji, 1))  # Prepara para conteo
-            | 'CountEmojis' >> beam.CombinePerKey(sum)  # Suma ocurrencias
-            | 'Top10Emojis' >> beam.combiners.Top.Of(10, key=lambda x: x[1])  # Mantiene solo el top 10
-            | 'PrintResults' >> beam.FlatMap(print)  # Imprime resultados en tiempo de ejecución
+            | "Leer Archivo" >> beam.io.ReadFromText(input_path)
+            | "Parsear y Extraer Menciones" >> beam.FlatMap(lambda line: extract_mentions(parse_json_line(line)))
+            | "Sumar Menciones" >> beam.CombinePerKey(sum)  # Combinar y sumar menciones en paralelo
+            | "Top 10 Más Mencionados" >> beam.transforms.combiners.Top.Of(10, key=lambda x: x[1])
+            | "Imprimir" >> beam.Map(print)
         )
 
-input_path = "../../data/farmers-protest-tweets-2021-2-4.json"
-q2_time_optimized(input_path)
+run_pipeline("../../data/farmers-protest-tweets-2021-2-4.json")
