@@ -14,16 +14,16 @@ def q1_time(input_file):
         
         parsed_tweets = (
             pipeline
-            | 'Read input file' >> beam.io.ReadFromText(input_file)
+            | 'input' >> beam.io.ReadFromText(input_file)
             | 'Parse tweets' >> beam.Map(parse_tweet)
         )
 
         top_dates = (
             parsed_tweets
-            | 'Count tweets per date' >> beam.combiners.Count.PerKey()
-            | 'Top 10 dates' >> beam.transforms.combiners.Top.Of(10, key=lambda x: x[1])
-            | 'Extract top dates' >> beam.FlatMap(lambda x: x)
-            | 'Create date lookup' >> beam.Map(lambda x: x[0])
+            | 'Extraer fechas de twitter' >> beam.combiners.Count.PerKey()
+            | 'Top 10' >> beam.transforms.combiners.Top.Of(10, key=lambda x: x[1])
+            | 'Extract' >> beam.FlatMap(lambda x: x)
+            | 'Key top 10' >> beam.Map(lambda x: x[0])
         )
 
         result = (
@@ -32,10 +32,10 @@ def q1_time(input_file):
                 lambda tweet, top_dates_set: tweet[0] in top_dates_set,
                 beam.pvalue.AsList(top_dates)
             )
-            | 'Group by date and aggregate users' >> beam.GroupByKey()
-            | 'Most active user per date' >> beam.Map(lambda x: (x[0], Counter(x[1]).most_common(1)[0][0]))
-            | 'Format output' >> beam.Map(lambda x: (datetime.strptime(x[0], '%Y-%m-%d').date(), x[1]))
-            | 'Collect results' >> beam.combiners.ToList()
+            | 'Agrupar' >> beam.GroupByKey()
+            | 'Usuario activo' >> beam.Map(lambda x: (x[0], Counter(x[1]).most_common(1)[0][0]))
+            | 'Formateo output' >> beam.Map(lambda x: (datetime.strptime(x[0], '%Y-%m-%d').date(), x[1]))
+            | 'Formateo final' >> beam.combiners.ToList()
         )
 
-        result | 'Print results' >> beam.Map(print)
+        result | 'Print' >> beam.Map(print)

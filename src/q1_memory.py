@@ -24,29 +24,29 @@ def q1_memory(input_file):
     with beam.Pipeline() as pipeline:
         tweets = (
             pipeline
-            | 'Read input file' >> beam.io.ReadFromText(input_file)
-            | 'Parse tweets' >> beam.Map(parse_tweet)
+            | 'Input' >> beam.io.ReadFromText(input_file)
+            | 'Columnar' >> beam.Map(parse_tweet)
         )
 
         top_10_dates = (
             tweets
             | 'Extraer fechas de twitter' >> beam.Map(lambda tweet: (tweet[0], 1))
             | 'Conteo por fechas' >> beam.CombinePerKey(sum)
-            | 'Gather all date counts' >> beam.combiners.ToList()
-            | 'Get top 10 dates globally' >> beam.FlatMap(lambda counts: get_top_10_elements(counts))
-            | 'Extract top 10 date keys' >> beam.Map(lambda x: x[0])
+            | 'Juntar conteos' >> beam.combiners.ToList()
+            | 'Obtener el top 10' >> beam.FlatMap(lambda counts: get_top_10_elements(counts))
+            | 'Key top 10' >> beam.Map(lambda x: x[0])
         )
 
         result = (
             tweets
-            | 'Filter by top 10 dates' >> beam.FlatMap(
+            | 'Filtrar fechas' >> beam.FlatMap(
                 lambda tweet, top_dates: filter_top_10_dates(tweet, top_dates),
                 beam.pvalue.AsList(top_10_dates)
             )
-            | 'Group by date' >> beam.GroupByKey()
-            | 'Find most active user per date' >> beam.Map(lambda x: (x[0], Counter(x[1]).most_common(1)[0][0]))
-            | 'Format output' >> beam.Map(lambda x: (datetime.strptime(x[0], '%Y-%m-%d').date(), x[1]))
-            | 'Collect as list' >> beam.combiners.ToList()
+            | 'Agrupar por fecha' >> beam.GroupByKey()
+            | 'Usuario mas activo por fecha' >> beam.Map(lambda x: (x[0], Counter(x[1]).most_common(1)[0][0]))
+            | 'Formateo' >> beam.Map(lambda x: (datetime.strptime(x[0], '%Y-%m-%d').date(), x[1]))
+            | 'Formateo final' >> beam.combiners.ToList()
         )
 
-        result | 'Print results' >> beam.Map(print)
+        result | 'Print' >> beam.Map(print)
