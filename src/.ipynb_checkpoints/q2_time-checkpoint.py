@@ -11,43 +11,8 @@ def count_emojis_optimized(line):
         record = json.loads(line)
         content = record.get('content', '')
         return extract_emojis_optimized(content)
-    except Exception as e:
-        return []  
-
-def q2_time(input_path):
-    with beam.Pipeline(options=PipelineOptions()) as p:
-        emoji_counts = (
-            p
-            | 'Leer archivo' >> beam.io.ReadFromText(input_path)
-            | 'Extraer emojis' >> beam.FlatMap(count_emojis_optimized)
-            | 'Pair' >> beam.Map(lambda emoji: (emoji, 1))
-            | 'Conteo emojis' >> beam.CombinePerKey(sum)
-            | 'Top 10' >> beam.transforms.combiners.Top.Of(10, key=lambda x: x[1])
-            | 'Aplanar' >> beam.FlatMap(lambda x: x)
-            | 'Recolectar en una lista' >> beam.combiners.ToList()
-            | 'print' >> beam.Map(print)
-        )
-        
-        
-        
-        
-        
-        
-import apache_beam as beam
-import emoji
-import json
-from apache_beam.options.pipeline_options import PipelineOptions
-
-def extract_emojis_optimized(text):
-    return [item['emoji'] for item in emoji.emoji_list(text)]
-
-def count_emojis_optimized(line):
-    try:
-        record = json.loads(line)
-        content = record.get('content', '')
-        return extract_emojis_optimized(content)
     except json.JSONDecodeError:
-        return []  # Solo en caso de errores JSON específicos
+        return []
 
 def q2_time2(input_path):
     with beam.Pipeline(options=PipelineOptions()) as p:
