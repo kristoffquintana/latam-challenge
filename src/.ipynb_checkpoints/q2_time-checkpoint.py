@@ -14,7 +14,7 @@ def count_emojis_optimized(line):
     except json.JSONDecodeError:
         return []
 
-def q2_time2(input_path):
+def q2_time(input_path):
     with beam.Pipeline(options=PipelineOptions()) as p:
         (
             p

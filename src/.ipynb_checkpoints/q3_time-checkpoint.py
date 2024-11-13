@@ -15,7 +15,7 @@ def extract_mentions(record):
         for mention in re.findall(r'@(\w+)', content):
             yield (mention, 1)
 
-def q3_time2(input_path):
+def q3_time(input_path):
     options = PipelineOptions()
     with beam.Pipeline(options=options) as p:
         (
