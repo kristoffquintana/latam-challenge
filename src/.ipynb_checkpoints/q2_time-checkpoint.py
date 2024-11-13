@@ -1,40 +1,64 @@
-# from typing import List, Tuple
-
-# def q2_time(file_path: str) -> List[Tuple[str, int]]:
-#     pass
-
-
-
 import apache_beam as beam
-import re
 import emoji
+import json
 from apache_beam.options.pipeline_options import PipelineOptions
 
-# Función para extraer emojis de un texto
-def extract_emojis(text):
-    return [char for char in text if char in emoji.EMOJI_DATA]
+def extract_emojis_optimized(text):
+    return [item['emoji'] for item in emoji.emoji_list(text)]
 
-# Función para contar emojis
-def count_emojis(line):
-    import json
+def count_emojis_optimized(line):
     try:
         record = json.loads(line)
         content = record.get('content', '')
-        return extract_emojis(content)
+        return extract_emojis_optimized(content)
     except Exception as e:
-        return []  # Si hay un error, retornamos una lista vacía
+        return []  
 
-# Pipeline de Apache Beam
 def q2_time(input_path):
     with beam.Pipeline(options=PipelineOptions()) as p:
         emoji_counts = (
             p
-            | 'ReadInputFile' >> beam.io.ReadFromText(input_path)
-            | 'ExtractEmojis' >> beam.FlatMap(count_emojis)
-            | 'PairWithOne' >> beam.Map(lambda emoji: (emoji, 1))
-            | 'CountEmojis' >> beam.CombinePerKey(sum)
-            | 'Top10Emojis' >> beam.combiners.Top.Of(10, key=lambda x: x[1])
-            | 'PrintResults' >> beam.FlatMap(lambda x: x)  # Desenpaquetar Top.Of
+            | 'Leer archivo' >> beam.io.ReadFromText(input_path)
+            | 'Extraer emojis' >> beam.FlatMap(count_emojis_optimized)
+            | 'Pair' >> beam.Map(lambda emoji: (emoji, 1))
+            | 'Conteo emojis' >> beam.CombinePerKey(sum)
+            | 'Top 10' >> beam.transforms.combiners.Top.Of(10, key=lambda x: x[1])
+            | 'Aplanar' >> beam.FlatMap(lambda x: x)
             | 'Recolectar en una lista' >> beam.combiners.ToList()
-            | 'PrintOutput' >> beam.Map(print)  # Mostrar en Jupyter
+            | 'print' >> beam.Map(print)
+        )
+        
+        
+        
+        
+        
+        
+import apache_beam as beam
+import emoji
+import json
+from apache_beam.options.pipeline_options import PipelineOptions
+
+def extract_emojis_optimized(text):
+    return [item['emoji'] for item in emoji.emoji_list(text)]
+
+def count_emojis_optimized(line):
+    try:
+        record = json.loads(line)
+        content = record.get('content', '')
+        return extract_emojis_optimized(content)
+    except json.JSONDecodeError:
+        return []  # Solo en caso de errores JSON específicos
+
+def q2_time2(input_path):
+    with beam.Pipeline(options=PipelineOptions()) as p:
+        (
+            p
+            | 'Leer archivo' >> beam.io.ReadFromText(input_path)
+            | 'Extraer y contar emojis' >> beam.FlatMap(count_emojis_optimized)
+            | 'Map a Pair' >> beam.Map(lambda emoji: (emoji, 1))
+            | 'Combinar conteos' >> beam.CombinePerKey(sum)
+            | 'Obtener Top 10' >> beam.transforms.combiners.Top.Of(10, key=lambda x: x[1])
+            | 'Aplanar resultados' >> beam.FlatMap(lambda x: x)
+            | 'Recolectar en una lista' >> beam.combiners.ToList()
+            | 'Imprimir resultados' >> beam.Map(print)
         )
